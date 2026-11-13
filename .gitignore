@@ -1,0 +1,19 @@
+node_modules/
+dist/
+out/
+
+# 开发调试产物
+shot-*.png
+shot-log.txt
+tmp-*.js
+.tmp-*/
+
+# 测试素材（本地生成，体积大）
+test-assets/
+
+# 工作区记忆与临时数据
+.workbuddy/
+
+*.log
+.DS_Store
+Thumbs.db

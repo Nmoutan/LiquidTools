@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+  />
+  <title>JSON</title>
+  <link rel="stylesheet" href="json.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <div class="tl">
+        <span class="logo"></span>
+        <span class="title">JSON 工具</span>
+        <span class="file" id="fileName"></span>
+      </div>
+      <div class="win-btns">
+        <button id="btnMin" title="最小化">
+          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </button>
+        <button id="btnClose" title="关闭">
+          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2.5 2.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="seg" id="fmtSeg">
+        <button data-fmt="json" data-on="1">JSON</button>
+        <button data-fmt="yaml">YAML</button>
+        <button data-fmt="csv">CSV</button>
+        <button data-fmt="xml">XML</button>
+      </div>
+      <div class="seg" id="indentSeg">
+        <button data-indent="2" data-on="1">2 空格</button>
+        <button data-indent="4">4 空格</button>
+        <button data-indent="min">压缩</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="btnClear">清空</button>
+      <button class="btn" id="btnCopy">复制结果</button>
+      <button class="btn primary" id="btnSave">另存为</button>
+    </div>
+
+    <div class="split">
+      <section class="pane">
+        <div class="pane-head"><span>输入</span><span class="meta" id="inMeta"></span></div>
+        <div class="editor">
+          <pre class="hl" id="hl" aria-hidden="true"></pre>
+          <textarea id="input" spellcheck="false" autocomplete="off"
+            placeholder="粘贴 JSON，或把 .json 文件拖进来"></textarea>
+        </div>
+      </section>
+      <section class="pane">
+        <div class="pane-head"><span>输出</span><span class="meta" id="outMeta"></span></div>
+        <div class="editor readonly">
+          <pre class="out" id="out"></pre>
+        </div>
+      </section>
+    </div>
+
+    <footer class="status" id="status">就绪</footer>
+  </div>
+
+  <script src="convert.js"></script>
+  <script src="json.js"></script>
+</body>
+</html>

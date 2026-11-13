@@ -1,0 +1,20 @@
+{
+  "name": "watertool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop dynamic-island style toolkit",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^45.3.0"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "sharp": "^0.35.5"
+  }
+}

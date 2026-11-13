@@ -1,0 +1,1239 @@
+/* ============================================================
+   配色：暖石墨（warm graphite）
+   —— 去掉一切彩色强调，主色用「墨黑」，状态色降到低饱和。
+      高级感的来源是中性色的层次和克制的对比，而不是颜色本身。
+   ============================================================ */
+
+:root {
+  --ink: #1c1a17;
+  --text: #1c1a17;
+  --dim: #6b655c;
+  --faint: #9a948a;
+
+  /* 所有描边 / 阴影都用暖黑，纯黑压在暖白上会发脏 */
+  --warm: 38, 33, 26;
+  --line: rgba(38, 33, 26, 0.075);
+  --line-2: rgba(38, 33, 26, 0.14);
+
+  --accent: #23201c;
+  --accent-soft: rgba(35, 32, 28, 0.07);
+
+  --ok: #4a7459;
+  --err: #a3563f;
+
+  /* 玻璃不透明度，由渲染层按桌面亮度写入（见 applyBackdrop）
+     这里只是采样回来之前的初始值，取值与 applyBackdrop 的亮桌面结果对齐 */
+  --ga: 0.955;
+  --gb: 0.935;
+  --gc: 0.965;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring: cubic-bezier(0.22, 1.1, 0.36, 1);
+
+  /* 玻璃表面的微观颗粒：真实玻璃不是纯色，这层噪点让它有「实体感」 */
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* 光斑位置注册成可插值属性，鼠标移动时高光会「追」而不是瞬移 */
+@property --mx {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+
+@property --my {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 深色壁纸上玻璃被迫做得更实，文字相应加深一档，补回对比度 */
+body[data-backdrop="dark"] {
+  --dim: #474139;
+  --faint: #5f5a52;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================================
+   岛本体：液态玻璃
+   四层结构：
+     1. base  —— 玻璃体（暖白渐变 + 表面颗粒）
+     2. ::before —— 边缘厚度（一圈渐变描边，上下亮、中段暗）
+     3. ::after  —— 折射光斑（跟随光标 + 极淡暖色色散）
+     4. box-shadow —— 接触阴影 + 环境阴影
+   ============================================================ */
+
+.island {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 152px;
+  height: 38px;
+  transform: translateX(-50%);
+  border-radius: 19px;
+
+  background-image:
+    var(--noise),
+    /* 顶部受光：光从上方打下来，玻璃上缘会泛白 */
+    radial-gradient(96% 34% at 50% -6%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(130% 90% at 50% -34%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 58%),
+    /* 玻璃体本身：保留一点透明度，桌面的明暗能透进来，才不会像一块白塑料 */
+    linear-gradient(
+      168deg,
+      rgba(255, 255, 255, var(--ga)) 0%,
+      rgba(252, 252, 252, var(--gb)) 44%,
+      rgba(243, 244, 247, var(--gc)) 100%
+    );
+  /* 四层背景必须各自给 size，否则 CSS 会循环取值把最后一层也平铺成 160px */
+  background-size: 160px 160px, 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+
+  box-shadow:
+    /* 硬边：玻璃和空气的交界，0.5px 就够 */
+    0 0 0 0.5px rgba(var(--warm), 0.07),
+    /* 外圈微光：玻璃在光下会在周围带一点亮晕 */
+    0 0 18px rgba(255, 255, 255, 0.3),
+    /* 接触阴影：模拟它真的贴在桌面上 */
+    0 1px 2px rgba(var(--warm), 0.07),
+    /* 中层落地阴影 */
+    0 6px 14px -4px rgba(var(--warm), 0.1),
+    /* 大范围环境遮蔽 */
+    0 20px 40px -14px rgba(var(--warm), 0.14),
+    /* 上缘镜面高光 */
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    /* 上缘内侧柔光，让顶部看起来是圆的 */
+    inset 0 10px 14px -14px rgba(255, 255, 255, 1),
+    /* 下缘内阴影，玻璃变厚的地方会变暗 */
+    inset 0 -12px 16px -14px rgba(var(--warm), 0.24),
+    /* 边缘聚光：玻璃四周因为厚度会把光聚起来 */
+    inset 0 0 18px -3px rgba(255, 255, 255, 0.55),
+    /* 极淡的暗角，避免边缘显得发飘 */
+    inset 0 0 26px -8px rgba(var(--warm), 0.03),
+    /* 左右边缘的极薄反光 */
+    inset 1px 0 0 rgba(255, 255, 255, 0.85),
+    inset -1px 0 0 rgba(255, 255, 255, 0.85);
+
+  overflow: hidden;
+  isolation: isolate;
+
+  transition:
+    width 400ms var(--spring),
+    height 400ms var(--spring),
+    border-radius 400ms var(--spring),
+    box-shadow 400ms var(--ease);
+  will-change: width, height;
+}
+
+/* 边缘厚度：上下两端是亮的（玻璃边缘会折射出高光），中段偏暗，
+   再叠一层极淡的色散 —— 真实玻璃的棱会把环境光拆成很弱的彩边 */
+.island::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.72) 8%,
+      rgba(var(--warm), 0.035) 30%,
+      rgba(var(--warm), 0.065) 66%,
+      rgba(255, 255, 255, 0.92) 100%
+    ),
+    conic-gradient(
+      from 150deg at 50% 50%,
+      rgba(150, 190, 255, 0.3) 0deg,
+      rgba(255, 186, 214, 0.26) 78deg,
+      rgba(255, 234, 176, 0.22) 168deg,
+      rgba(164, 226, 212, 0.24) 256deg,
+      rgba(150, 190, 255, 0.3) 360deg
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* 折射光斑：主光斑是白光，右下方跟一层极淡的暖色，像玻璃把环境色散开 */
+.island::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      200px circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.9),
+      rgba(255, 255, 255, 0.28) 34%,
+      rgba(255, 255, 255, 0) 62%
+    ),
+    radial-gradient(
+      300px circle at calc(var(--mx) + 6%) calc(var(--my) + 14%),
+      rgba(255, 206, 158, 0.13),
+      rgba(255, 206, 158, 0) 66%
+    );
+  opacity: 0;
+  transition:
+    opacity 320ms linear,
+    --mx 260ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    --my 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.island[data-state="expanded"]::after {
+  opacity: 1;
+}
+
+/* 展开后体积大，阴影要更散更淡，否则像一块塑料板 */
+.island[data-state="expanded"] {
+  width: 356px;
+  height: 430px;
+  border-radius: 26px;
+  box-shadow:
+    0 0 0 0.5px rgba(var(--warm), 0.07),
+    0 0 22px rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(var(--warm), 0.07),
+    0 10px 24px -10px rgba(var(--warm), 0.12),
+    0 34px 70px -24px rgba(var(--warm), 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 14px 20px -20px rgba(255, 255, 255, 1),
+    inset 0 -22px 28px -24px rgba(var(--warm), 0.2),
+    inset 0 0 40px -14px rgba(var(--warm), 0.05),
+    inset 1px 0 0 rgba(255, 255, 255, 0.85),
+    inset -1px 0 0 rgba(255, 255, 255, 0.85);
+}
+
+.island[data-state="drop"] {
+  width: 196px;
+  height: 46px;
+  border-radius: 23px;
+  background-image:
+    var(--noise),
+    radial-gradient(130% 80% at 50% -30%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0) 58%),
+    linear-gradient(168deg, rgba(250, 247, 242, 0.97) 0%, rgba(226, 220, 211, 0.96) 100%);
+}
+
+/* ============ 收起态 ============ */
+
+.pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 15px;
+  z-index: 2;
+  opacity: 1;
+  transition: opacity 130ms linear;
+}
+
+.island[data-state="expanded"] .pill {
+  opacity: 0;
+  transition: opacity 80ms linear;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 3px rgba(var(--warm), 0.045);
+  transition: background-color 240ms linear, box-shadow 240ms linear;
+}
+
+.dot[data-tone="busy"] {
+  background: var(--ink);
+  box-shadow: 0 0 0 3px rgba(var(--warm), 0.1);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.dot[data-tone="ok"] {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(74, 116, 89, 0.12);
+}
+
+.dot[data-tone="err"] {
+  background: var(--err);
+  box-shadow: 0 0 0 3px rgba(163, 86, 63, 0.12);
+}
+
+.dot[data-tone="offer"] {
+  background: var(--ink);
+  box-shadow: 0 0 0 3px rgba(var(--warm), 0.11);
+  /* 只闪 6 次就停下：剪贴板里的东西可能在那一放几小时，
+     无限动画会让合成器一直出帧，白耗电。闪完停成实心状态，
+     提示依然在，但渲染进程可以彻底空闲。 */
+  animation: pulse 1.6s ease-in-out 6;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.label {
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.65);
+  font-size: 11.5px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
+
+.island[data-state="drop"] .label {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.meter {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(var(--warm), 0.08);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 400ms linear;
+}
+
+.meter[data-active="1"] {
+  opacity: 1;
+}
+
+.meter i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(var(--warm), 0.45), var(--ink));
+  transition: width 240ms linear;
+}
+
+/* ============ 展开态面板 ============ */
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 150ms linear;
+}
+
+.island[data-state="expanded"] .panel {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 210ms linear 110ms;
+}
+
+.head {
+  flex: 0 0 auto;
+  height: 48px;
+  padding: 0 12px 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #3a352e, #1c1a17);
+  box-shadow: 0 0 0 2.5px rgba(var(--warm), 0.07);
+}
+
+.brand-name {
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.4px;
+}
+
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  transition: background-color 150ms linear, color 150ms linear;
+}
+
+.icon-btn:hover {
+  background: rgba(var(--warm), 0.06);
+  color: var(--text);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 14px 10px;
+  gap: 10px;
+}
+
+/* 投放区 */
+
+.dropzone {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 20px 12px;
+  border-radius: 18px;
+  color: var(--faint);
+  /* 玻璃上的凹槽：几乎不填色，只靠细描边和一点内阴影，
+     否则一整块白会把玻璃的通透感吃掉 */
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--warm), 0.05),
+    inset 0 2px 6px -2px rgba(var(--warm), 0.055),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.7);
+  transition: background-color 220ms linear, box-shadow 220ms linear, color 220ms linear;
+}
+
+.body:has(.job) .dropzone,
+.body:has(.setup:not([hidden])) .dropzone {
+  display: none;
+}
+
+.body:not(:has(.job)):not(:has(.setup:not([hidden]))) .dropzone {
+  flex: 1 1 auto;
+}
+
+.body:has(.setup:not([hidden])):not(:has(.job)) {
+  justify-content: safe center;
+}
+
+.dropzone[data-active="1"] {
+  color: var(--ink);
+  background: rgba(var(--warm), 0.055);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--warm), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dz-icon {
+  opacity: 0.5;
+  margin-bottom: 2px;
+}
+
+.dz-title {
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.6);
+  margin: 0;
+  font-size: 12.5px;
+  color: #3d3831;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.dropzone[data-active="1"] .dz-title {
+  color: var(--ink);
+}
+
+.dz-sub {
+  margin: 0;
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.15px;
+}
+
+.dz-paste {
+  margin-top: 8px;
+  border: 0;
+  padding: 5px 12px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-family: inherit;
+  color: var(--dim);
+  background: rgba(var(--warm), 0.06);
+  cursor: pointer;
+  transition: background-color 150ms linear, color 150ms linear;
+}
+
+.dz-paste:hover {
+  background: rgba(var(--warm), 0.1);
+  color: var(--text);
+}
+
+/* 剪贴板待处理提示 */
+
+.offer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 14px;
+  background: rgba(var(--warm), 0.045);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--warm), 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  animation: rise 240ms var(--ease);
+}
+
+.offer[hidden] {
+  display: none;
+}
+
+.body:has(.setup:not([hidden])) .offer {
+  display: none;
+}
+
+.offer-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.offer-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offer-sub {
+  font-size: 10.5px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offer-btn {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-family: inherit;
+  color: #fdfcfa;
+  cursor: pointer;
+  background: linear-gradient(180deg, #33302a, #1b1916);
+  box-shadow:
+    0 1px 3px rgba(var(--warm), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  transition: filter 140ms linear;
+}
+
+.offer-btn:hover {
+  filter: brightness(1.14);
+}
+
+.offer-skip {
+  flex: 0 0 auto;
+  border: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  transition: background-color 140ms linear, color 140ms linear;
+}
+
+.offer-skip:hover {
+  background: rgba(var(--warm), 0.07);
+  color: var(--text);
+}
+
+/* ============ 参数配置 ============ */
+
+.setup {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--warm), 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(var(--warm), 0.03);
+  animation: rise 260ms var(--ease);
+}
+
+.setup[hidden] {
+  display: none;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.setup-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.setup-name {
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.6);
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.1px;
+}
+
+.setup-size {
+  font-size: 11px;
+  color: var(--faint);
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--dim);
+  background: rgba(var(--warm), 0.06);
+  letter-spacing: 0.25px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-label {
+  font-size: 11.5px;
+  color: var(--dim);
+  letter-spacing: 0.1px;
+}
+
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-value {
+  font-size: 11.5px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* 压缩后大小预估：一行字 + 一个节省比例，够用就好，别抢参数区的注意力 */
+
+.estimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 17px;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1px;
+  transition: opacity 200ms linear;
+}
+
+.estimate[data-state="busy"] {
+  color: var(--faint);
+  animation: estPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes estPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.est-main {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.est-main b {
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.est-note {
+  font-style: normal;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.est-badge {
+  flex: 0 0 auto;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.15px;
+  color: var(--dim);
+  background: rgba(var(--warm), 0.06);
+  box-shadow: inset 0 0 0 1px rgba(var(--warm), 0.06);
+}
+
+.est-badge[data-tone="down"] {
+  color: #3f6b4f;
+  background: rgba(74, 116, 89, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(74, 116, 89, 0.16);
+}
+
+.est-badge[data-tone="up"] {
+  color: var(--err);
+  background: rgba(163, 86, 63, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(163, 86, 63, 0.16);
+}
+
+/* 分段选择：灰槽 + 白片，靠层级而不是颜色区分 */
+
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2.5px;
+  border-radius: 11px;
+  background: rgba(var(--warm), 0.055);
+  box-shadow: inset 0 0 0 1px rgba(var(--warm), 0.035);
+}
+
+.seg {
+  flex: 1 1 0;
+  border: 0;
+  padding: 6px 4px;
+  border-radius: 8.5px;
+  background: transparent;
+  color: var(--dim);
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 160ms linear, color 160ms linear, box-shadow 160ms linear;
+  white-space: nowrap;
+}
+
+.seg:hover {
+  color: var(--text);
+}
+
+.seg[data-on="1"] {
+  color: var(--text);
+  font-weight: 500;
+  background: #fffefc;
+  box-shadow:
+    0 1px 2px rgba(var(--warm), 0.14),
+    0 0 0 0.5px rgba(var(--warm), 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* 滑块 */
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  /* --fill 由 JS 按当前值写入 */
+  background: linear-gradient(
+    90deg,
+    rgba(var(--warm), 0.55) 0%,
+    var(--ink) var(--fill, 0%),
+    rgba(var(--warm), 0.11) var(--fill, 0%),
+    rgba(var(--warm), 0.11) 100%
+  );
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #fffefc;
+  box-shadow:
+    0 1px 3px rgba(var(--warm), 0.34),
+    0 0 0 0.5px rgba(var(--warm), 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  transition: transform 120ms ease;
+}
+
+.slider:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+/* 开关 */
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toggle-label {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.toggle-hint {
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 21px;
+  border-radius: 11px;
+  background: rgba(var(--warm), 0.14);
+  box-shadow: inset 0 1px 2px rgba(var(--warm), 0.08);
+  transition: background-color 200ms var(--ease);
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fffefc;
+  box-shadow:
+    0 1px 2px rgba(var(--warm), 0.3),
+    inset 0 0.5px 0 rgba(255, 255, 255, 1);
+  transition: transform 220ms var(--spring);
+}
+
+.switch[data-on="1"] {
+  background: var(--ink);
+}
+
+.switch[data-on="1"]::after {
+  transform: translateX(15px);
+}
+
+/* 主按钮 */
+
+.primary {
+  width: 100%;
+  border: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: #fdfcfa;
+  cursor: pointer;
+  background: linear-gradient(180deg, #36322c 0%, #1b1916 100%);
+  box-shadow:
+    0 1px 2px rgba(var(--warm), 0.2),
+    0 4px 12px -4px rgba(var(--warm), 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+  transition: transform 140ms var(--ease), box-shadow 140ms linear, filter 140ms linear;
+}
+
+.primary:hover {
+  filter: brightness(1.16);
+  box-shadow:
+    0 1px 2px rgba(var(--warm), 0.2),
+    0 6px 16px -4px rgba(var(--warm), 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+}
+
+.primary:active {
+  transform: scale(0.985);
+}
+
+.primary.ghost {
+  color: var(--text);
+  background: rgba(var(--warm), 0.055);
+  box-shadow: inset 0 0 0 1px rgba(var(--warm), 0.08);
+}
+
+/* ============ 任务列表 ============ */
+
+/* 只有任务列表时，内容不多就居中，别让卡片孤零零贴在顶上留一大片空 */
+.body:has(.job):not(:has(.setup:not([hidden]))) {
+  justify-content: safe center;
+}
+
+/* 任务上方的批量操作条：只有存在产物时才出现 */
+.jobs-tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px;
+  animation: rise 200ms var(--ease);
+}
+
+.jobs-tools[hidden] {
+  display: none;
+}
+
+.jobs-tools-count {
+  font-size: 11px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-btn {
+  border: 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  color: var(--text);
+  background: rgba(var(--warm), 0.06);
+  box-shadow: inset 0 0 0 1px rgba(var(--warm), 0.07);
+  cursor: pointer;
+  transition: background-color 140ms linear, color 140ms linear;
+}
+
+.mini-btn:hover {
+  background: rgba(var(--warm), 0.11);
+}
+
+.mini-btn[data-state="busy"] {
+  color: var(--faint);
+}
+
+.mini-btn[data-state="done"] {
+  color: #3f6b4f;
+  background: rgba(74, 116, 89, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(74, 116, 89, 0.16);
+}
+
+.mini-btn[data-state="err"] {
+  color: var(--err);
+  background: rgba(163, 86, 63, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(163, 86, 63, 0.16);
+}
+
+.jobs {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-right: -6px;
+  padding-right: 6px;
+}
+
+.jobs:empty {
+  display: none;
+}
+
+.jobs::-webkit-scrollbar {
+  width: 4px;
+}
+
+.jobs::-webkit-scrollbar-thumb {
+  background: rgba(var(--warm), 0.14);
+  border-radius: 2px;
+}
+
+.job {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--warm), 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(var(--warm), 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: rise 240ms var(--ease);
+}
+
+.job[data-clickable="1"] {
+  cursor: pointer;
+}
+
+.job[data-clickable="1"]:hover {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.job-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.job-name {
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-state {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.job[data-status="done"] .job-state {
+  color: var(--ok);
+}
+
+.job[data-status="error"] .job-state {
+  color: var(--err);
+}
+
+.job[data-status="cancelled"] .job-state {
+  color: var(--faint);
+}
+
+.job-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(var(--warm), 0.085);
+  overflow: hidden;
+}
+
+.job-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(var(--warm), 0.4), var(--ink));
+  transition: width 220ms linear;
+}
+
+.job[data-status="done"] .job-bar i {
+  background: linear-gradient(90deg, #5b8a6b, #3f6b50);
+}
+
+.job[data-status="error"] .job-bar i {
+  background: var(--err);
+}
+
+/* 结果行：说明文字 + 「复制」，按钮只占右边一小块 */
+.job-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-copy {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.2px;
+  color: var(--dim);
+  background: rgba(var(--warm), 0.055);
+  box-shadow: inset 0 0 0 1px rgba(var(--warm), 0.06);
+  cursor: pointer;
+  transition: background-color 140ms linear, color 140ms linear;
+}
+
+.job-copy[hidden] {
+  display: none;
+}
+
+.job-copy:hover {
+  color: var(--text);
+  background: rgba(var(--warm), 0.1);
+}
+
+.job-copy[data-state="busy"] {
+  color: var(--faint);
+}
+
+.job-copy[data-state="done"] {
+  color: #3f6b4f;
+  background: rgba(74, 116, 89, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(74, 116, 89, 0.16);
+}
+
+.job-copy[data-state="err"] {
+  color: var(--err);
+  background: rgba(163, 86, 63, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(163, 86, 63, 0.16);
+}
+
+/* ============ 底部 ============ */
+
+.foot {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 12px 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 产物目录按钮：图标跟文字按钮同视觉重量，别抢「退出」的位置 */
+.foot-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--dim);
+  margin-right: 2px;
+}
+
+.foot-icon:hover {
+  color: var(--text);
+}
+
+.text-btn {
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 5px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 150ms linear, color 150ms linear;
+}
+
+.text-btn:hover {
+  background: rgba(var(--warm), 0.06);
+  color: var(--text);
+}
+
+.text-btn.quiet:hover {
+  color: var(--err);
+}

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
+  />
+  <title>waterTool</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="stage">
+    <div class="island" id="island" data-state="idle">
+      <!-- 收起态 -->
+      <div class="pill" id="pill">
+        <span class="dot" id="dot"></span>
+        <span class="label" id="label">拖文件进来</span>
+        <span class="meter" id="meter"><i></i></span>
+      </div>
+
+      <!-- 展开态 -->
+      <div class="panel">
+        <header class="head">
+          <div class="brand">
+            <span class="brand-dot"></span>
+            <span class="brand-name">waterTool</span>
+          </div>
+          <button class="icon-btn" id="btnCollapse" title="收起">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2.5 6h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="body">
+          <div class="offer" id="offer" hidden>
+            <div class="offer-text">
+              <span class="offer-title" id="offerTitle">剪贴板里有内容</span>
+              <span class="offer-sub" id="offerSub"></span>
+            </div>
+            <button class="offer-btn" id="btnOfferTake">处理</button>
+            <button class="offer-skip" id="btnOfferSkip" title="忽略">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4"
+                  stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="dropzone" id="dropzone">
+            <svg class="dz-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 16V5m0 0L8 9m4-4l4 4" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor"
+                stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <p class="dz-title">把文件拖到这里</p>
+            <p class="dz-sub">图片 · 视频 · JSON</p>
+            <button class="dz-paste" id="btnPaste">从剪贴板粘贴</button>
+          </div>
+
+          <div class="setup" id="setup" hidden></div>
+
+          <div class="jobs-tools" id="jobsTools" hidden>
+            <span class="jobs-tools-count" id="jobsCount"></span>
+            <button class="mini-btn" id="btnCutAll">剪切全部</button>
+          </div>
+
+          <div class="jobs" id="jobs"></div>
+        </div>
+
+        <footer class="foot">
+          <span class="hint" id="hint">Ctrl+Alt+V 取剪贴板</span>
+          <span class="foot-actions">
+            <button class="icon-btn foot-icon" id="btnOutput" title="打开产物目录（右键可更换位置）">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M1.6 4.4a1 1 0 011-1h3.1l1.2 1.5h6.5a1 1 0 011 1v6a1 1 0 01-1 1h-10.8a1 1 0 01-1-1z"
+                  stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button class="text-btn" id="btnClear">清空</button>
+            <button class="text-btn quiet" id="btnQuit">退出</button>
+          </span>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
